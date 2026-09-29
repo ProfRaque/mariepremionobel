@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratório de Marie Curie - A Jornada do Nobel</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { margin: 0; overflow: hidden; font-family: 'Georgia', 'Segoe UI', serif; user-select: none; background: #000; color: #fff; }
+        
+        #canvas-container { width: 100vw; height: 100vh; position: relative; z-index: 1; }
+
+        /* TELA DE INÍCIO E INSTRUÇÕES */
+        #instrucoes {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, rgba(20,25,20,0.88) 0%, rgba(5,8,5,0.96) 100%);
+            color: #f0e6d2; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center;
+            cursor: pointer; z-index: 10; text-align: center; backdrop-filter: blur(8px);
+            transition: opacity 0.4s ease;
+        }
+        
+        .card {
+            background: rgba(15, 22, 18, 0.95); border: 2px solid #d4af37;
+            padding: 35px; border-radius: 12px; box-shadow: 0 0 35px rgba(0, 255, 102, 0.2);
+            max-width: 580px; width: 90%; pointer-events: none;
+        }
+
+        #instrucoes h1 { margin-bottom: 12px; color: #d4af37; font-size: 26px; text-transform: uppercase; letter-spacing: 2px; }
+        #instrucoes p { margin: 8px 0; font-size: 14px; color: #ddd; line-height: 1.5; }
+        .highlight { color: #00ff66; font-weight: bold; margin-top: 15px !important; font-size: 16px; }
+        .controls-box { margin: 18px 0; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 8px; text-align: left; font-size: 13px; border: 1px solid #444; line-height: 1.6; }
+
+        /* MIRA E PROMPT D'AÇÃO */
+        #mira {
+            position: absolute; top: 50%; left: 50%; width: 8px; height: 8px;
+            background-color: #00ff66; border-radius: 50%;
+            transform: translate(-50%, -50%); pointer-events: none; z-index: 5;
+            box-shadow: 0 0 8px #00ff66; display: none;
+        }
+
+        #prompt-acao {
+            position: absolute; top: 58%; left: 50%; transform: translate(-50%, -50%);
+            color: #00ff66; font-family: monospace; font-size: 15px;
+            font-weight: bold; text-shadow: 0 0 8px #000; display: none; z-index: 5;
+            background: rgba(0,20,10,0.85); padding: 8px 16px; border-radius: 6px;
+            border: 1px solid #00ff66;
+        }
+
+        /* HUD / PAINEL SUPERIOR E INFERIOR */
+        #hud {
+            position: absolute; bottom: 20px; left: 20px;
+            color: #fff; font-family: monospace; font-size: 13px;
+            pointer-events: none; z-index: 5; background: rgba(10,15,12,0.9);
+            padding: 14px 18px; border-radius: 8px; border: 1px solid #d4af37;
+            display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        }
+
+        #score-box {
+            position: absolute; top: 20px; left: 20px;
+            color: #d4af37; font-family: monospace; font-size: 18px; font-weight: bold;
+            pointer-events: none; z-index: 5; background: rgba(10,15,12,0.9);
+            padding: 12px 20px; border-radius: 8px; border: 1px solid #d4af37;
+            display: none; box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+        }
+
+        #missao-box {
+            position: absolute; top: 20px; right: 20px;
+            color: #f0e6d2; font-size: 13px; pointer-events: none; z-index: 5; 
+            background: rgba(10, 18, 14, 0.92); padding: 18px; 
+            border-radius: 8px; border: 1px solid #00ff66; width: 340px;
+            box-shadow: 0 4px 20px rgba(0,255,102,0.15); display: none;
+        }
+        #missao-box h3 { color: #d4af37; margin-bottom: 10px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; }
+        .concluida { text-decoration: line-through; color: #00ff66; opacity: 0.8; }
+        .ativa { color: #fff; font-weight: bold; }
+
+        /* MODAIS DE QUIZ / LIVROS E CADERNO */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(5, 10, 8, 0.92); color: #fff;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 25; backdrop-filter: blur(8px);
+        }
+        .modal-box {
+            background: rgba(15, 22, 18, 0.98); border: 2px solid #d4af37;
+            padding: 30px; border-radius: 12px; text-align: left; max-width: 600px; width: 90%;
+            box-shadow: 0 0 35px rgba(0, 255, 102, 0.25); position: relative;
+        }
+        .modal-box h2 { margin-bottom: 12px; font-size: 20px; color: #d4af37; text-transform: uppercase; letter-spacing: 1px; }
+        .modal-box .subtext { font-size: 14px; color: #aaa; margin-bottom: 20px; font-style: italic; }
+        .pergunta-texto { font-size: 15px; color: #eee; margin-bottom: 20px; line-height: 1.5; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 6px; border-left: 3px solid #00ff66; }
+        .opcoes-container { display: flex; flex-direction: column; gap: 10px; }
+        .btn-quiz-opcao {
+            padding: 12px 16px; font-size: 14px; background: rgba(255,255,255,0.05);
+            color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer;
+            text-align: left; transition: all 0.2s ease; font-family: inherit;
+        }
+        .btn-quiz-opcao:hover { background: rgba(0, 255, 102, 0.2); border-color: #00ff66; color: #00ff66; }
+        .btn-fechar {
+            margin-top: 20px; padding: 10px 20px; background: #333; color: #fff; border: 1px solid #666;
+            border-radius: 6px; cursor: pointer; float: right; transition: 0.2s;
+        }
+        .btn-fechar:hover { background: #555; }
+
+        /* TELA DE VITÓRIA - PRÊMIO NOBEL */
+        #nobel-screen {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: radial-gradient(circle, #1a1608 0%, #050401 100%); color: #d4af37;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 30; text-align: center; padding: 30px;
+        }
+        #nobel-screen h1 { font-size: 36px; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 15px; text-shadow: 0 0 20px rgba(212,175,55,0.6); }
+        #nobel-screen .medal { font-size: 70px; margin-bottom: 15px; }
+        #nobel-screen p { color: #dddddd; max-width: 650px; font-size: 16px; line-height: 1.7; margin-bottom: 25px; }
+        #nobel-screen .score-final { font-size: 22px; color: #00ff66; font-weight: bold; margin-bottom: 30px; }
+        #nobel-screen button {
+            background: #d4af37; color: #000; border: none; padding: 14px 32px; font-size: 16px;
+            font-weight: bold; cursor: pointer; border-radius: 6px; text-transform: uppercase;
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.4); transition: all 0.3s ease;
+        }
+        #nobel-screen button:hover { background: #fff; transform: scale(1.05); }
+
+        /* NOTIFICAÇÃO DE FEEDBACK */
+        #toast {
+            position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,255,102,0.9); color: #000; font-weight: bold; padding: 10px 24px;
+            border-radius: 30px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
+            z-index: 20; box-shadow: 0 0 15px rgba(0,255,102,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toast">Notificação</div>
+
+    <!-- MODAL DO CADERNO / LIVROS -->
+    <div id="modal-leitura" class="modal-overlay">
+        <div class="modal-box">
+            <h2 id="modal-titulo">Livro Científico</h2>
+            <div id="modal-subtext" class="subtext">Anotações do Laboratório</div>
+            <div id="modal-conteudo" class="pergunta-texto">Conteúdo aqui...</div>
+            <div id="modal-opcoes" class="opcoes-container"></div>
+            <button id="btn-fechar-modal" class="btn-fechar" onclick="fecharModal()">Fechar</button>
+        </div>
+    </div>
+
+    <!-- TELA FINAL DO PRÊMIO NOBEL -->
+    <div id="nobel-screen">
+        <div class="medal">🥇</div>
+        <h1>Prêmio Nobel de Física (1903)</h1>
+        <p>Parabéns, Madame Curie! Através da sua dedicação incansável no isolamento da pechblenda e da rigorosa medição da radioatividade com o eletrômetro, você e Pierre Curie revolucionaram a física e a química moderna com a descoberta do <strong>Polônio</strong> e do <strong>Rádio</strong>.</p>
+        <div id="final-score" class="score-final">Pontuação Final: 0 pts</div>
+        <button onclick="window.location.reload()">Refazer os Experimentos</button>
+    </div>
+
+    <!-- TELA DE INÍCIO -->
+    <div id="instrucoes">
+        <div class="card">
+            <h1>Laboratório de Marie Curie</h1>
+            <p>Siga os passos do experimento histórico para isolar os elementos radioativos e conquistar o Prêmio Nobel de Física de 1903. Responda aos questionários no Caderno e nos Livros para acumular pontos!</p>
+            <div class="controls-box">
+                <div><strong>Setas (↑, ↓, ←, →):</strong> Caminhar pelo laboratório</div>
+                <div><strong>Mouse:</strong> Olhar ao redor</div>
+                <div><strong>[E]:</strong> Interagir / Pegar Elemento / Ler Livros e Caderno</div>
+                <div><strong>[C]:</strong> Alternar Visão (1ª / 3ª Pessoa de Marie Curie)</div>
+                <div><strong>[F]:</strong> Ligar / Desligar Lâmpada de Gás</div>
+            </div>
+            <p class="highlight">Clique aqui para entrar no Laboratório</p>
+        </div>
+    </div>
+
+    <div id="mira"></div>
+    <div id="prompt-acao">Pressione [E] para Interagir</div>
+
+    <div id="score-box">Pontuação: <span id="score-val">0</span> pts</div>
+
+    <div id="missao-box">
+        <h3>Experimento de Isolamento:</h3>
+        <ul id="lista-objetivos" style="list-style-type: none; line-height: 1.8;">
+            <li id="step-1" class="ativa">1. Pegar Pechblenda e medir no Eletrômetro</li>
+            <li id="step-2">2. Triturar e realizar Dissolução Ácida no Caldeirão</li>
+            <li id="step-3">3. Realizar Cristalização Fracionada na Bancada</li>
+            <li id="step-4">4. Isolar amostras puras de Polônio e Rádio</li>
+            <li id="step-5">5. Registrar resultados no Caderno de Anotações</li>
+        </ul>
+    </div>
+
+    <div id="hud">
+        Visão: <span id="cam-status" style="color:#00ff66;">1ª PESSOA</span> | 
+        Lanterna: <span id="flashlight-status" style="color:#00ff66;">LIGADA</span> | 
+        Mão: <span id="held-item" style="color:#d4af37;">Vazia</span>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+
+    <script>
+        // SISTEMA DE PONTUAÇÃO E ESTADO DO JOGO
+        let score = 0;
+        let currentStep = 1;
+        let heldElement = null; // 'pechblenda', 'solucao_acida', 'cristal_bruto', 'radio_puro'
+        const booksRead = new Set();
+
+        function addScore(pts, reason) {
+            score += pts;
+            document.getElementById('score-val').innerText = score;
+            showToast(`+${pts} pts: ${reason}`);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.opacity = '1';
+            setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+        }
+
+        // GERADORES PROCEDURAIS DE TEXTURA
+        function generateBrickWallTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#221d1a'; ctx.fillRect(0, 0, 512, 512);
+            const rows = 16, cols = 8, bh = 512 / rows, bw = 512 / cols;
+            for (let r = 0; r < rows; r++) {
+                const offset = (r % 2) * (bw / 2);
+                for (let c = -1; c <= cols + 1; c++) {
+                    const x = c * bw + offset, y = r * bh;
+                    const shade = Math.floor(40 + Math.random() * 25);
+                    ctx.fillStyle = `rgb(${shade + 20}, ${shade + 10}, ${shade})`;
+                    ctx.fillRect(x + 2, y + 2, bw - 4, bh - 4);
+                }
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
+            return texture;
+        }
+
+        function generateWoodTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#3a2312'; ctx.fillRect(0, 0, 512, 512);
+            ctx.fillStyle = 'rgba(0,0,0,0.12)';
+            for (let i = 0; i < 400; i++) {
+                ctx.fillRect(0, Math.random() * 512, 512, 1 + Math.random() * 2);
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
+            return texture;
+        }
+
+        function generateFloorTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1e1b18'; ctx.fillRect(0, 0, 512, 512);
+            const tileSize = 64;
+            for (let x = 0; x < 512; x += tileSize) {
+                for (let y = 0; y < 512; y += tileSize) {
+                    const c = Math.floor(30 + Math.random() * 20);
+                    ctx.fillStyle = `rgb(${c},${c},${c})`;
+                    ctx.fillRect(x + 1, y + 1, tileSize - 2, tileSize - 2);
+                }
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
+            return texture;
+        }
+
+        // CENA, CÂMERA E RENDERIZADOR
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0d0a);
+        scene.fog = new THREE.FogExp2(0x0a0d0a, 0.03);
+
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // ILUMINAÇÃO DO LABORATÓRIO (Luzes quentes de gás + Brilho radioativo)
+        const ambientLight = new THREE.AmbientLight(0xffeedd, 0.6);
+        scene.add(ambientLight);
+
+        const gasLamp1 = new THREE.PointLight(0xffaa44, 1.8, 18);
+        gasLamp1.position.set(-4, 3.5, -4);
+        gasLamp1.castShadow = true;
+        scene.add(gasLamp1);
+
+        const gasLamp2 = new THREE.PointLight(0xffaa44, 1.8, 18);
+        gasLamp2.position.set(4, 3.5, 4);
+        gasLamp2.castShadow = true;
+        scene.add(gasLamp2);
+
+        // Lâmpada de Mão de Marie
+        const flashLight = new THREE.SpotLight(0xffddaa, 2.0, 20, Math.PI / 4, 0.4, 1.0);
+        camera.add(flashLight);
+        flashLight.position.set(0.2, -0.1, 0);
+        flashLight.target.position.set(0, 0, -1);
+        camera.add(flashLight.target);
+        scene.add(camera);
+
+        let flashlightOn = true;
+        function toggleFlashlight() {
+            flashlightOn = !flashlightOn;
+            flashLight.intensity = flashlightOn ? 2.0 : 0.0;
+            document.getElementById('flashlight-status').innerText = flashlightOn ? 'LIGADA' : 'DESLIGADA';
+            document.getElementById('flashlight-status').style.color = flashlightOn ? '#00ff66' : '#ff3333';
+        }
+
+        // MODELO DE MARIE CURIE (3ª PESSOA) & MÃOS (1ª PESSOA)
+        const playerGroup = new THREE.Group();
+        scene.add(playerGroup);
+
+        const dressMat = new THREE.MeshStandardMaterial({ color: 0x1a1a24, roughness: 0.9 });
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xe0c8b1, roughness: 0.6 });
+        
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.45, 1.3, 16), dressMat);
+        body.position.y = 0.65; playerGroup.add(body);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 16), skinMat);
+        head.position.y = 1.45; playerGroup.add(head);
+        playerGroup.visible = false;
+
+        // Mão em 1ª Pessoa segurando elementos
+        const handGroup = new THREE.Group();
+        camera.add(handGroup);
+        handGroup.position.set(0.25, -0.25, -0.4);
+
+        const handMesh = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 12), skinMat);
+        handGroup.add(handMesh);
+
+        // Mesh visual do elemento segurado na mão
+        const heldItemMesh = new THREE.Mesh(
+            new THREE.DodecahedronGeometry(0.06),
+            new THREE.MeshStandardMaterial({ color: 0x00ff66, emissive: 0x00aa33, roughness: 0.2 })
+        );
+        heldItemMesh.position.set(0, 0.05, -0.02);
+        heldItemMesh.visible = false;
+        handGroup.add(heldItemMesh);
+
+        let isThirdPerson = false;
+        function toggleCameraView() {
+            isThirdPerson = !isThirdPerson;
+            document.getElementById('cam-status').innerText = isThirdPerson ? '3ª PESSOA' : '1ª PESSOA';
+            document.getElementById('cam-status').style.color = isThirdPerson ? '#d4af37' : '#00ff66';
+            playerGroup.visible = isThirdPerson;
+            handGroup.visible = !isThirdPerson;
+        }
+
+        // CONSTRUÇÃO DO GALPÃO DO LABORATÓRIO
+        const wallTex = generateBrickWallTexture(); wallTex.repeat.set(3, 2);
+        const floorTex = generateFloorTexture(); floorTex.repeat.set(4, 4);
+        const woodTex = generateWoodTexture();
+
+        const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.8 });
+        const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.6 });
+        const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.7 });
+        const glassMat = new THREE.MeshStandardMaterial({ color: 0xaaccff, transparent: true, opacity: 0.4, roughness: 0.1 });
+
+        const collisionBoxes = [];
+        const interactables = [];
+
+        function createBox(w, h, d, mat, x, y, z, rx=0, ry=0, rz=0, isSolid=true) {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+            mesh.position.set(x, y, z);
+            mesh.rotation.set(rx, ry, rz);
+            mesh.castShadow = true; mesh.receiveShadow = true;
+            scene.add(mesh);
+            if (isSolid) collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
+            return mesh;
+        }
+
+        // Salão Principal (16m x 18m)
+        createBox(16, 0.2, 18, floorMat, 0, 0, 0); // Chão
+        createBox(16, 6, 0.3, wallMat, 0, 3, -9); // Parede Fundo
+        createBox(16, 6, 0.3, wallMat, 0, 3, 9);  // Parede Frente
+        createBox(0.3, 6, 18, wallMat, -8, 3, 0); // Parede Esquerda
+        createBox(0.3, 6, 18, wallMat, 8, 3, 0);  // Parede Direita
+        createBox(16, 0.2, 18, woodMat, 0, 6, 0); // Teto de Madeira
+
+        // BANCADAS DE TRABALHO
+        // Bancada 1: Entrada / Medição (Eletrômetro de Pierre Curie)
+        const bench1 = createBox(5, 0.9, 1.8, woodMat, -4.5, 0.45, -6.5);
+        // Bancada 2: Trituração e Caldeirão de Dissolução
+        const bench2 = createBox(5, 0.9, 1.8, woodMat, 4.5, 0.45, -6.5);
+        // Bancada 3: Cristalização Fracionada
+        const bench3 = createBox(5, 0.9, 1.8, woodMat, 4.5, 0.45, 2.0);
+        // Mesa Principal de Marie Curie (Caderno de Anotações)
+        const mainDesk = createBox(4, 0.9, 2.2, woodMat, -4.5, 0.45, 2.0);
+
+        // OBJETOS DO EXPERIMENTO
+        // 1. Pechblenda (Minério Radioativo)
+        const pechblendaMesh = new THREE.Mesh(
+            new THREE.DodecahedronGeometry(0.25),
+            new THREE.MeshStandardMaterial({ color: 0x223322, roughness: 0.9 })
+        );
+        pechblendaMesh.position.set(-6, 1.1, -6.5);
+        scene.add(pechblendaMesh);
+        pechblendaMesh.userData = { id: 'pechblenda', name: 'Minério de Pechblenda', interactable: true };
+        interactables.push(pechblendaMesh);
+
+        // Brilho da Pechblenda
+        const oreGlow = new THREE.PointLight(0x00ff66, 0.8, 2.5);
+        oreGlow.position.copy(pechblendaMesh.position);
+        scene.add(oreGlow);
+
+        // 2. Eletrômetro de Piezoelectricidade de Pierre Curie
+        const electrometroGroup = new THREE.Group();
+        const baseEl = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.4, 16), woodMat);
+        electrometroGroup.add(baseEl);
+        const glassChamber = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.5, 16), glassMat);
+        glassChamber.position.y = 0.45; electrometroGroup.add(glassChamber);
+        electrometroGroup.position.set(-3.5, 1.1, -6.5);
+        scene.add(electrometroGroup);
+        baseEl.userData = { id: 'electrometro', name: 'Eletrômetro de Piezoelectricidade', interactable: true };
+        interactables.push(baseEl);
+
+        // 3. Caldeirão de Dissolução Ácida
+        const vatMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.4, 0.7, 16), new THREE.MeshStandardMaterial({ color: 0x332211, roughness: 0.8 }));
+        vatMesh.position.set(4.5, 1.25, -6.5);
+        scene.add(vatMesh);
+        vatMesh.userData = { id: 'caldeirao', name: 'Caldeirão de Dissolução Ácida', interactable: true };
+        interactables.push(vatMesh);
+
+        // 4. Bacia de Cristalização Fracionada
+        const basinMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.3, 0.3, 16), glassMat);
+        basinMesh.position.set(4.5, 1.05, 2.0);
+        scene.add(basinMesh);
+        basinMesh.userData = { id: 'cristalizador', name: 'Bacia de Cristalização Fracionada', interactable: true };
+        interactables.push(basinMesh);
+
+        // 5. Caderno de Anotações de Marie Curie
+        const notebookMesh = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.05, 0.5), new THREE.MeshStandardMaterial({ color: 0x4a2a18, roughness: 0.5 }));
+        notebookMesh.position.set(-4.5, 0.93, 2.0);
+        scene.add(notebookMesh);
+        notebookMesh.userData = { id: 'caderno', name: 'Caderno de Anotações de Marie Curie', interactable: true };
+        interactables.push(notebookMesh);
+
+        const notebookGlow = new THREE.PointLight(0x00ff66, 1.2, 2.0);
+        notebookGlow.position.set(-4.5, 1.2, 2.0);
+        scene.add(notebookGlow);
+
+        // LIVROS ESPALHADOS PELO LABORATÓRIO (COM QUIZES)
+        function createBook(title, id, x, y, z, color) {
+            const book = new THREE.Mesh(
+                new THREE.BoxGeometry(0.3, 0.06, 0.4),
+                new THREE.MeshStandardMaterial({ color: color, roughness: 0.6 })
+            );
+            book.position.set(x, y, z);
+            book.rotation.y = (Math.random() - 0.5) * 0.8;
+            scene.add(book);
+            book.userData = { id: id, name: title, interactable: true, isBook: true };
+            interactables.push(book);
+        }
+
+        createBook("Livro: Descoberta de Becquerel (1896)", "livro_becquerel", -5.5, 0.93, 2.2, 0x1f3a52);
+        createBook("Livro: Tabela Periódica de Mendeleev", "livro_mendeleev", 3.5, 0.93, -6.2, 0x5a2a1f);
+        createBook("Livro: Tratado de Eletrometria de Pierre", "livro_eletrometria", -2.5, 0.93, -6.5, 0x2f4f2f);
+        createBook("Livro: Química Analítica e Frações", "livro_quimica", 5.5, 0.93, 2.2, 0x4b0082);
+
+        // DADOS DOS QUIZES DOS LIVROS E CADERNO
+        const quizDatabase = {
+            livro_becquerel: {
+                titulo: "Livro: Raios de Becquerel (1896)",
+                subtext: "Estudo sobre a radiação espontânea do Urânio.",
+                pergunta: "O físico Henri Becquerel descobriu que os sais de urânio emitiam radiação sem necessidade de luz solar. Como Marie Curie denominou essa propriedade da matéria?",
+                opcoes: [
+                    { texto: "A) Fluorescência Térmica", correta: false },
+                    { texto: "B) Radioatividade", correta: true },
+                    { texto: "C) Magnetismo Atômico", correta: false },
+                    { texto: "D) Fosforescência Estável", correta: false }
+                ]
+            },
+            livro_mendeleev: {
+                titulo: "Livro: Tabela Periódica de Mendeleev",
+                subtext: "Organização dos elementos conhecidos no século XIX.",
+                pergunta: "Ao analisar a Pechblenda, Marie percebeu que ela era mais radioativa do que o urânio puro. O que isso indicava?",
+                opcoes: [
+                    { texto: "A) Que o urânio perdia força com o tempo", correta: false },
+                    { texto: "B) Que havia elementos desconhecidos mais ativos na amostra", correta: true },
+                    { texto: "C) Que o minério absorvia eletricidade do ar", correta: false },
+                    { texto: "D) Que a medição estava incorreta", correta: false }
+                ]
+            },
+            livro_eletrometria: {
+                titulo: "Livro: Tratado de Eletrometria de Pierre Curie",
+                subtext: "Medição de correntes elétricas extremamente fracas no ar.",
+                pergunta: "O Eletrômetro de Piezoelectricidade mede a radiação através de qual fenômeno físico no ar?",
+                opcoes: [
+                    { texto: "A) Ionização do ar provocada pela radiação", correta: true },
+                    { texto: "B) Aquecimento do vidro da câmara", correta: false },
+                    { texto: "C) Mudança de cor do quartzo", correta: false },
+                    { texto: "D) Condutividade térmica do gás", correta: false }
+                ]
+            },
+            livro_quimica: {
+                titulo: "Livro: Química Analítica & Cristalização",
+                subtext: "Processos industriais e laboratoriais de separação química.",
+                pergunta: "Qual foi a técnica exaustiva utilizada por Marie Curie para separar o Rádio do Bário a partir de toneladas de minério?",
+                opcoes: [
+                    { texto: "A) Destilação a Vácuo", correta: false },
+                    { texto: "B) Cristalização Fracionada", correta: true },
+                    { texto: "C) Centrifugação Gasosa", correta: false },
+                    { texto: "D) Eletrólise de Alta Voltagem", correta: false }
+                ]
+            },
+            caderno_final: {
+                titulo: "Caderno de Anotações - Registro do Nobel",
+                subtext: "Formulando a síntese para a Academia Real das Ciências da Suécia.",
+                pergunta: "Quais foram os dois novos elementos químicos radioativos isolados por Marie e Pierre Curie em seu laboratório?",
+                opcoes: [
+                    { texto: "A) Plutônio e Netúnio", correta: false },
+                    { texto: "B) Polônio e Rádio", correta: true },
+                    { texto: "C) Tório e Frâncio", correta: false },
+                    { texto: "D) Césio e Bismuto", correta: false }
+                ]
+            }
+        };
+
+        // CONTROLE DOS MODAIS DE QUIZ E LIVROS
+        let activeQuizKey = null;
+
+        function abrirModalQuiz(key) {
+            activeQuizKey = key;
+            const data = quizDatabase[key];
+            
+            document.getElementById('modal-titulo').innerText = data.titulo;
+            document.getElementById('modal-subtext').innerText = data.subtext;
+            document.getElementById('modal-conteudo').innerText = data.pergunta;
+
+            const container = document.getElementById('modal-opcoes');
+            container.innerHTML = '';
+
+            data.opcoes.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-quiz-opcao';
+                btn.innerText = opt.texto;
+                btn.onclick = () => responderQuiz(opt.correta);
+                container.appendChild(btn);
+            });
+
+            controls.unlock();
+            document.getElementById('modal-leitura').style.display = 'flex';
+        }
+
+        function responderQuiz(isCorreta) {
+            fecharModal();
+            if (isCorreta) {
+                if (!booksRead.has(activeQuizKey)) {
+                    booksRead.add(activeQuizKey);
+                    addScore(150, "Resposta Correta no Quiz Científico!");
+                } else {
+                    showToast("Você já respondeu este questionário com sucesso!");
+                }
+
+                if (activeQuizKey === 'caderno_final' && currentStep === 5) {
+                    completarExperimentoNobel();
+                }
+            } else {
+                showToast("Resposta incorreta! Releia os conceitos e tente novamente.");
+            }
+            controls.lock();
+        }
+
+        function fecharModal() {
+            document.getElementById('modal-leitura').style.display = 'none';
+        }
+
+        // SISTEMA DE PASSOS DO EXPERIMENTO
+        function avançarEtapa(passoConcluido) {
+            document.getElementById(`step-${passoConcluido}`).classList.remove('ativa');
+            document.getElementById(`step-${passoConcluido}`).classList.add('concluida');
+            
+            currentStep = passoConcluido + 1;
+            if (currentStep <= 5) {
+                document.getElementById(`step-${currentStep}`).classList.add('ativa');
+            }
+            
+            addScore(300, `Etapa ${passoConcluido} Concluída!`);
+        }
+
+        function atualizarMaoUI(itemNome) {
+            document.getElementById('held-item').innerText = itemNome;
+            heldItemMesh.visible = (itemNome !== 'Vazia');
+        }
+
+        // INTERAÇÃO DO JOGADOR
+        const raycaster = new THREE.Raycaster();
+        const centerVector = new THREE.Vector2(0, 0);
+        let targetedObject = null;
+
+        function checkInteraction() {
+            raycaster.setFromCamera(centerVector, camera);
+            const intersects = raycaster.intersectObjects(interactables);
+            const promptEl = document.getElementById('prompt-acao');
+
+            if (intersects.length > 0 && intersects[0].distance < 3.5) {
+                targetedObject = intersects[0].object;
+                const data = targetedObject.userData;
+
+                if (data.isBook) {
+                    promptEl.innerText = `[E] Ler ${data.name}`;
+                } else if (data.id === 'pechblenda' && currentStep === 1 && !heldElement) {
+                    promptEl.innerText = `[E] Pegar Minério de Pechblenda`;
+                } else if (data.id === 'electrometro' && currentStep === 1 && heldElement === 'pechblenda') {
+                    promptEl.innerText = `[E] Colocar Pechblenda no Eletrômetro e Medir Radiação`;
+                } else if (data.id === 'caldeirao' && currentStep === 2 && heldElement === 'pechblenda_medida') {
+                    promptEl.innerText = `[E] Triturar e Dissolver na Solução Ácida`;
+                } else if (data.id === 'cristalizador' && currentStep === 3 && heldElement === 'solucao_acida') {
+                    promptEl.innerText = `[E] Iniciar Cristalização Fracionada`;
+                } else if (data.id === 'caderno') {
+                    if (currentStep === 5) promptEl.innerText = `[E] Registrar Descoberta e Reclamar Nobel`;
+                    else promptEl.innerText = `[E] Consultar Caderno de Anotações de Marie`;
+                } else {
+                    promptEl.innerText = `[E] Examinar ${data.name}`;
+                }
+                promptEl.style.display = 'block';
+            } else {
+                targetedObject = null;
+                promptEl.style.display = 'none';
+            }
+        }
+
+        function interact() {
+            if (!targetedObject) return;
+            const data = targetedObject.userData;
+
+            if (data.isBook) {
+                abrirModalQuiz(data.id);
+                return;
+            }
+
+            // Passo 1: Pegar e medir Pechblenda
+            if (data.id === 'pechblenda' && currentStep === 1 && !heldElement) {
+                heldElement = 'pechblenda';
+                pechblendaMesh.visible = false;
+                oreGlow.visible = false;
+                atualizarMaoUI("Pechblenda Bruta");
+                showToast("Pechblenda coletada! Leve-a ao Eletrômetro de Pierre na bancada oposta.");
+            }
+            else if (data.id === 'electrometro' && currentStep === 1 && heldElement === 'pechblenda') {
+                heldElement = 'pechblenda_medida';
+                atualizarMaoUI("Pechblenda Medida");
+                showToast("O Eletrômetro indicou alta ionização no ar! A Pechblenda é extremamente ativa.");
+                avançarEtapa(1);
+            }
+            // Passo 2: Caldeirão de Dissolução
+            else if (data.id === 'caldeirao' && currentStep === 2 && heldElement === 'pechblenda_medida') {
+                heldElement = 'solucao_acida';
+                atualizarMaoUI("Frasco de Solução Ácida");
+                showToast("Pechblenda dissolvida em ácido fervente. Leve a solução à Bacia de Cristalização!");
+                avançarEtapa(2);
+            }
+            // Passo 3 e 4: Cristalização Fracionada e Isolamento
+            else if (data.id === 'cristalizador' && currentStep === 3 && heldElement === 'solucao_acida') {
+                heldElement = 'radio_puro';
+                atualizarMaoUI("Amostra Pura de Rádio");
+                showToast("Após centenas de cristalizações, o Bário foi separado! Você obteve o Rádio Puro.");
+                avançarEtapa(3);
+                avançarEtapa(4);
+            }
+            // Passo 5: Caderno de Anotações
+            else if (data.id === 'caderno') {
+                if (currentStep === 5) {
+                    abrirModalQuiz('caderno_final');
+                } else {
+                    showToast("Caderno de Marie Curie: Continue os passos do experimento para registrar os dados.");
+                }
+            }
+        }
+
+        function completarExperimentoNobel() {
+            controls.unlock();
+            document.getElementById('hud').style.display = 'none';
+            document.getElementById('missao-box').style.display = 'none';
+            document.getElementById('score-box').style.display = 'none';
+            document.getElementById('mira').style.display = 'none';
+            document.getElementById('prompt-acao').style.display = 'none';
+            
+            document.getElementById('final-score').innerText = `Pontuação Final: ${score} pts`;
+            document.getElementById('nobel-screen').style.display = 'flex';
+        }
+
+        // CONTROLES DE MOVIMENTO
+        const controls = new THREE.PointerLockControls(camera, document.body);
+
+        document.getElementById('instrucoes').addEventListener('click', () => {
+            controls.lock();
+        });
+
+        controls.addEventListener('lock', () => {
+            document.getElementById('instrucoes').style.display = 'none';
+            document.getElementById('hud').style.display = 'block';
+            document.getElementById('missao-box').style.display = 'block';
+            document.getElementById('score-box').style.display = 'block';
+            document.getElementById('mira').style.display = 'block';
+        });
+
+        controls.addEventListener('unlock', () => {
+            if (document.getElementById('nobel-screen').style.display !== 'flex' &&
+                document.getElementById('modal-leitura').style.display !== 'flex') {
+                document.getElementById('instrucoes').style.display = 'flex';
+            }
+        });
+
+        let moveF = false, moveB = false, moveL = false, moveR = false;
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'ArrowUp') moveF = true;
+            if (e.code === 'ArrowDown') moveB = true;
+            if (e.code === 'ArrowLeft') moveL = true;
+            if (e.code === 'ArrowRight') moveR = true;
+            if (e.code === 'KeyE') interact();
+            if (e.code === 'KeyF') toggleFlashlight();
+            if (e.code === 'KeyC') toggleCameraView();
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowUp') moveF = false;
+            if (e.code === 'ArrowDown') moveB = false;
+            if (e.code === 'ArrowLeft') moveL = false;
+            if (e.code === 'ArrowRight') moveR = false;
+        });
+
+        camera.position.set(-4.5, 1.6, 6.0);
+
+        function checkCollision(newPos) {
+            const playerRadius = 0.4;
+            for (let box of collisionBoxes) {
+                if (box.clone().expandByScalar(playerRadius).containsPoint(newPos)) return true;
+            }
+            return false;
+        }
+
+        // LOOP DE ANIMAÇÃO
+        let prevTime = performance.now();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = performance.now();
+            const delta = Math.min((time - prevTime) / 1000, 0.1);
+            prevTime = time;
+
+            if (controls.isLocked) {
+                const speed = 4.5 * delta;
+                const frontDir = new THREE.Vector3();
+                camera.getWorldDirection(frontDir); frontDir.y = 0; frontDir.normalize();
+
+                const sideDir = new THREE.Vector3();
+                sideDir.crossVectors(camera.up, frontDir).negate().normalize();
+
+                const moveVector = new THREE.Vector3();
+                if (moveF) moveVector.addScaledVector(frontDir, speed);
+                if (moveB) moveVector.addScaledVector(frontDir, -speed);
+                if (moveL) moveVector.addScaledVector(sideDir, -speed);
+                if (moveR) moveVector.addScaledVector(sideDir, speed);
+
+                const nextPos = camera.position.clone().add(moveVector);
+                if (!checkCollision(nextPos)) {
+                    camera.position.copy(nextPos);
+                }
+
+                checkInteraction();
+            }
+
+            if (isThirdPerson) {
+                playerGroup.position.copy(camera.position).sub(new THREE.Vector3(0, 1.6, 0));
+                const dir = new THREE.Vector3();
+                camera.getWorldDirection(dir);
+                playerGroup.rotation.y = Math.atan2(dir.x, dir.z);
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
